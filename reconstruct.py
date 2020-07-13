@@ -220,8 +220,6 @@ if __name__ == "__main__":
 
         logging.debug("loading {}".format(npz))
 
-        data_sdf = deep_sdf.data.read_sdf_samples_into_ram(full_filename)
-
         for k in range(repeat):
 
             if rerun > 1:
@@ -246,25 +244,32 @@ if __name__ == "__main__":
 
             logging.info("reconstructing {}".format(npz))
 
-            data_sdf[0] = data_sdf[0][torch.randperm(data_sdf[0].shape[0])]
-            data_sdf[1] = data_sdf[1][torch.randperm(data_sdf[1].shape[0])]
-
             start = time.time()
-            err, latent = reconstruct(
-                decoder,
-                int(args.iterations),
-                latent_size,
-                data_sdf,
-                0.01,  # [emp_mean,emp_var],
-                0.1,
-                num_samples=8000,
-                lr=5e-3,
-                l2reg=True,
-            )
-            logging.debug("reconstruct time: {}".format(time.time() - start))
-            err_sum += err
-            logging.debug("current_error avg: {}".format((err_sum / (ii + 1))))
-            logging.debug(ii)
+
+            use_saved_latent_vector = True
+            err, latent = None, None
+            if use_saved_latent_vector:
+                latent = torch.load(os.path.join(ws.get_latent_codes_dir(args.experiment_directory), "latest.pth"))['latent_codes']['weight'].cuda()
+            else:
+                data_sdf = deep_sdf.data.read_sdf_samples_into_ram(full_filename)
+                data_sdf[0] = data_sdf[0][torch.randperm(data_sdf[0].shape[0])]
+                data_sdf[1] = data_sdf[1][torch.randperm(data_sdf[1].shape[0])]
+
+                err, latent = reconstruct(
+                    decoder,
+                    int(args.iterations),
+                    latent_size,
+                    data_sdf,
+                    0.01,  # [emp_mean,emp_var],
+                    0.1,
+                    num_samples=8000,
+                    lr=5e-3,
+                    l2reg=True,
+                )
+                logging.debug("reconstruct time: {}".format(time.time() - start))
+                err_sum += err
+                logging.debug("current_error avg: {}".format((err_sum / (ii + 1))))
+                logging.debug(ii)
 
             logging.debug("latent: {}".format(latent.detach().cpu().numpy()))
 

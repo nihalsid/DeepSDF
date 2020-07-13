@@ -48,8 +48,7 @@ def filter_classes(patterns, classes):
 def process_mesh(mesh_filepath, target_filepath, executable, additional_args):
     logging.info(mesh_filepath + " --> " + target_filepath)
     command = [executable, "-m", mesh_filepath, "-o", target_filepath] + additional_args
-
-    subproc = subprocess.Popen(command, stdout=subprocess.DEVNULL)
+    subproc = subprocess.Popen(command, shell=False)
     subproc.wait()
 
 
@@ -220,6 +219,8 @@ if __name__ == "__main__":
             try:
                 mesh_filename = deep_sdf.data.find_mesh_in_directory(shape_dir)
 
+                #specific_args = ["--sply", "--ply", "test.ply", "-s", "10000000"]
+                #specific_args = ["-s", "5000000"]
                 specific_args = []
 
                 if args.surface_sampling:
@@ -237,7 +238,8 @@ if __name__ == "__main__":
 
                 meshes_targets_and_specific_args.append(
                     (
-                        os.path.join(shape_dir, mesh_filename),
+                        # os.path.join(shape_dir, mesh_filename),
+                        mesh_filename,
                         processed_filepath,
                         specific_args,
                     )

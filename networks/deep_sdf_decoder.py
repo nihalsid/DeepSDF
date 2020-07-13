@@ -4,7 +4,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-
+from deep_sdf import embedder
 
 class Decoder(nn.Module):
     def __init__(
@@ -25,7 +25,14 @@ class Decoder(nn.Module):
         def make_sequence():
             return []
 
-        dims = [latent_size + 3] + dims + [1]
+        self.use_positional_encoding = True
+        self.disable_tanh = False
+
+        self.embedder, self.embedder_out_dim = embedder.get_embedder_nerf(10, input_dims=3, i=0)
+        if not self.use_positional_encoding:
+            dims = [latent_size + 3] + dims + [1]
+        else:
+            dims = [latent_size + self.embedder_out_dim] + dims + [1]
 
         self.num_layers = len(dims)
         self.norm_layers = norm_layers
@@ -36,6 +43,7 @@ class Decoder(nn.Module):
 
         self.xyz_in_all = xyz_in_all
         self.weight_norm = weight_norm
+
 
         for layer in range(0, self.num_layers - 1):
             if layer + 1 in latent_in:
@@ -73,18 +81,23 @@ class Decoder(nn.Module):
     # input: N x (L+3)
     def forward(self, input):
         xyz = input[:, -3:]
-
+        positional_encoded_input = input
         if input.shape[1] > 3 and self.latent_dropout:
             latent_vecs = input[:, :-3]
             latent_vecs = F.dropout(latent_vecs, p=0.2, training=self.training)
             x = torch.cat([latent_vecs, xyz], 1)
+        elif self.use_positional_encoding:
+            latent_vecs = input[:, :-3]
+            xyz_pos = self.embedder(xyz)
+            x = torch.cat([latent_vecs, xyz_pos], 1)
+            positional_encoded_input = torch.cat([latent_vecs, xyz_pos], 1)
         else:
             x = input
 
         for layer in range(0, self.num_layers - 1):
             lin = getattr(self, "lin" + str(layer))
             if layer in self.latent_in:
-                x = torch.cat([x, input], 1)
+                x = torch.cat([x, positional_encoded_input], 1)
             elif layer != 0 and self.xyz_in_all:
                 x = torch.cat([x, xyz], 1)
             x = lin(x)
@@ -103,7 +116,7 @@ class Decoder(nn.Module):
                 if self.dropout is not None and layer in self.dropout:
                     x = F.dropout(x, p=self.dropout_prob, training=self.training)
 
-        if hasattr(self, "th"):
+        if not self.disable_tanh and hasattr(self, "th"):
             x = self.th(x)
 
         return x

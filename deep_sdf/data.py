@@ -46,9 +46,13 @@ class MultipleMeshFileError(RuntimeError):
 
 
 def find_mesh_in_directory(shape_dir):
-    mesh_filenames = list(glob.iglob(shape_dir + "/**/*.obj")) + list(
+    mesh_filenames_obj = list(glob.iglob(shape_dir + "/**/*.obj")) + list(
         glob.iglob(shape_dir + "/*.obj")
     )
+    mesh_filenames_ply = list(glob.iglob(shape_dir + "/**/*.ply")) + list(
+        glob.iglob(shape_dir + "/*.ply")
+    )
+    mesh_filenames = mesh_filenames_obj + mesh_filenames_ply
     if len(mesh_filenames) == 0:
         raise NoMeshFileError()
     elif len(mesh_filenames) > 1:
@@ -84,6 +88,31 @@ def unpack_sdf_samples(filename, subsample=None):
 
     sample_pos = torch.index_select(pos_tensor, 0, random_pos)
     sample_neg = torch.index_select(neg_tensor, 0, random_neg)
+
+    samples = torch.cat([sample_pos, sample_neg], 0)
+
+    return samples
+
+
+def unpack_sdf_samples_custom(filename, subsample=None):
+
+    npz = np.load(filename)
+
+    all_points = npz["points"].astype(np.float32)
+    all_occupancies = npz["occupancies"].astype(np.float32)
+
+    concat = torch.from_numpy(np.hstack((all_points, all_occupancies[:, np.newaxis])))
+
+    pos_indices = np.where(all_occupancies != 0)[0]
+    neg_indices = np.where(all_occupancies == 0)[0]
+
+    half = int(subsample / 2)
+
+    random_pos = torch.from_numpy(np.array(random.sample(pos_indices.tolist(), half))).long()
+    random_neg = torch.from_numpy(np.array(random.sample(neg_indices.tolist(), half))).long()
+
+    sample_pos = torch.index_select(concat, 0, random_pos)
+    sample_neg = torch.index_select(concat, 0, random_neg)
 
     samples = torch.cat([sample_pos, sample_neg], 0)
 
@@ -169,3 +198,4 @@ class SDFSamples(torch.utils.data.Dataset):
             )
         else:
             return unpack_sdf_samples(filename, self.subsample), idx
+

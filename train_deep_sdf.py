@@ -9,7 +9,9 @@ import os
 import logging
 import math
 import json
+import numpy as np
 import time
+import torch.nn.functional as F
 
 import deep_sdf
 import deep_sdf.workspace as ws
@@ -351,7 +353,7 @@ def main_function(experiment_directory, continue_from, batch_split):
         batch_size=scene_per_batch,
         shuffle=True,
         num_workers=num_data_loader_threads,
-        drop_last=True,
+        drop_last=False,
     )
 
     logging.debug("torch num_threads: {}".format(torch.get_num_threads()))
@@ -499,6 +501,7 @@ def main_function(experiment_directory, continue_from, batch_split):
                     pred_sdf = torch.clamp(pred_sdf, minT, maxT)
 
                 chunk_loss = loss_l1(pred_sdf, sdf_gt[i].cuda()) / num_sdf_samples
+                # chunk_loss = F.binary_cross_entropy_with_logits(pred_sdf, sdf_gt[i].cuda(), reduction='sum') / num_sdf_samples
 
                 if do_code_regularization:
                     l2_size_loss = torch.sum(torch.norm(batch_vecs, dim=1))
