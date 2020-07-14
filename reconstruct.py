@@ -249,7 +249,7 @@ if __name__ == "__main__":
             use_saved_latent_vector = True
             err, latent = None, None
             if use_saved_latent_vector:
-                latent = torch.load(os.path.join(ws.get_latent_codes_dir(args.experiment_directory), "latest.pth"))['latent_codes']['weight'].cuda()
+                latent = torch.load(os.path.join(ws.get_latent_codes_dir(args.experiment_directory), "latest.pth"))['latent_codes']['weight'].cuda()[ii, :]
             else:
                 data_sdf = deep_sdf.data.read_sdf_samples_into_ram(full_filename)
                 data_sdf[0] = data_sdf[0][torch.randperm(data_sdf[0].shape[0])]
