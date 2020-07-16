@@ -183,7 +183,7 @@ if __name__ == "__main__":
 
     npz_filenames = deep_sdf.data.get_instance_filenames(args.data_source, split)
 
-    random.shuffle(npz_filenames)
+    # random.shuffle(npz_filenames)
 
     logging.debug(decoder)
 
