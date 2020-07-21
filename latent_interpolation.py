@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     npz_filenames = deep_sdf.data.get_instance_filenames(args.data_source, split)
 
-    random.shuffle(npz_filenames)
+    # random.shuffle(npz_filenames)
 
     logging.debug(decoder)
 
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     rerun = 0
 
     reconstruction_dir = os.path.join(
-        args.experiment_directory, ws.reconstructions_subdir, str(saved_model_epoch)
+        args.experiment_directory, ws.reconstructions_subdir, str(saved_model_epoch) + "_interp"
     )
 
     if not os.path.isdir(reconstruction_dir):
@@ -219,23 +219,12 @@ if __name__ == "__main__":
 
     latent_codes = []
 
+    data_root = "/".join(npz_filenames[0].split("/")[:-1]) 
 
     for npz in args.sample_interp: 
+        npz = data_root + "/" + npz + ".npz"
         ii = npz_filenames.index(npz)
         full_filename = os.path.join(args.data_source, ws.sdf_samples_subdir, npz)
-
-        if rerun > 1:
-            mesh_filename = os.path.join(
-                reconstruction_meshes_dir, npz[:-4] + "-" + str(k + rerun)
-            )
-            latent_filename = os.path.join(
-                reconstruction_codes_dir, npz[:-4] + "-" + str(k + rerun) + ".pth"
-            )
-        else:
-            mesh_filename = os.path.join(reconstruction_meshes_dir, npz[:-4])
-            latent_filename = os.path.join(
-                reconstruction_codes_dir, npz[:-4] + ".pth"
-            )
 
         logging.info("reconstructing {}".format(npz))
 
@@ -248,21 +237,28 @@ if __name__ == "__main__":
 
     for step in range(num_interpol_steps + 1):
 
-            decoder.eval()
-            latent = latent_codes[0] + (step * (latent_codes[1] - latent_codes[0]) / num_interpol_steps )
+        mesh_filename = os.path.join(
+            reconstruction_meshes_dir, npz[:-4] + "-" + str(step)
+        )
+        latent_filename = os.path.join(
+            reconstruction_codes_dir, npz[:-4] + "-" + str(step) + ".pth"
+        )
+        
+        decoder.eval()
+        latent = latent_codes[0] + (step * (latent_codes[1] - latent_codes[0]) / num_interpol_steps )
 
-            if not os.path.exists(os.path.dirname(mesh_filename)):
-                os.makedirs(os.path.dirname(mesh_filename))
+        if not os.path.exists(os.path.dirname(mesh_filename)):
+            os.makedirs(os.path.dirname(mesh_filename))
 
-            if not save_latvec_only:
-                start = time.time()
-                with torch.no_grad():
-                    deep_sdf.mesh.create_mesh(
-                        decoder, latent, mesh_filename, N=256, max_batch=int(2 ** 18)
-                    )
-                logging.debug("total time: {}".format(time.time() - start))
+        if not save_latvec_only:
+            start = time.time()
+            with torch.no_grad():
+                deep_sdf.mesh.create_mesh(
+                    decoder, latent, mesh_filename, N=256, max_batch=int(2 ** 18)
+                )
+            logging.debug("total time: {}".format(time.time() - start))
 
-            if not os.path.exists(os.path.dirname(latent_filename)):
-                os.makedirs(os.path.dirname(latent_filename))
+        if not os.path.exists(os.path.dirname(latent_filename)):
+            os.makedirs(os.path.dirname(latent_filename))
 
-            torch.save(latent.unsqueeze(0), latent_filename)
+        torch.save(latent.unsqueeze(0), latent_filename)
